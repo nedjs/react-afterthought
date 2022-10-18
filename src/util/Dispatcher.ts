@@ -1,5 +1,6 @@
+import {ServiceHistory} from "../types";
 
-interface EventHandler<T> {
+export interface DispatchHandler<T> {
 	(data: T): any;
 }
 
@@ -32,8 +33,8 @@ class ListNode<T> {
 	}
 }
 
-export class Dispatcher<T = string> {
-	private readonly handlersHead = new ListNode<EventHandler<T>>(null);
+export class Dispatcher<T = ServiceHistory> {
+	private readonly handlersHead = new ListNode<DispatchHandler<T>>(null);
 
 	emit(data: T) {
 		// go next right away cause handlersHead is always a placeholder node
@@ -44,7 +45,7 @@ export class Dispatcher<T = string> {
 		}
 	}
 
-	listen(callback: EventHandler<T>) {
+	listen(callback: DispatchHandler<T>) {
 		const newNode = new ListNode(callback);
 
 		this.handlersHead.add(newNode);

@@ -11,6 +11,7 @@ module.exports = {
             react: 'React',
         },
     },
+    external: ['react'],
     plugins: [
     ],
 }

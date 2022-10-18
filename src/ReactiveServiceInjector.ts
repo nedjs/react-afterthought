@@ -1,16 +1,17 @@
 import {useEffect, useRef, useState} from "react";
 import {
-	ServiceConstructor,
 	ReactiveInjector,
 	ReactiveService,
-	ReactiveServiceInstance
+	ReactiveServiceInstance,
+	ServiceHistory
 } from "./types";
 import {currentRenderingComponentName, debug, isInReactDispatching, isInReactRendering} from "./util/helpers";
-import {Dispatcher} from "./util/Dispatcher";
+import {Dispatcher, DispatchHandler} from "./util/Dispatcher";
 
 
 export class ReactiveServiceInjector implements ReactiveInjector {
-	private readonly cache = new Map<any, {
+	private readonly serviceNames = new Map<string, any>();
+	private readonly services = new Map<any, {
 		instance?: any,
 		type: any,
 		name: string,
@@ -20,12 +21,14 @@ export class ReactiveServiceInjector implements ReactiveInjector {
 	constructor(
 		config: Record<string, ReactiveService>
 	) {
-		for(let key in config) {
-			this.cache.set(config[key], {
+		for (let key in config) {
+			this.serviceNames.set(key, config[key]);
+
+			this.services.set(config[key], {
 				instance: undefined,
 				type: config[key],
 				name: key,
-				dispatcher: new Dispatcher<string>(),
+				dispatcher: new Dispatcher(),
 			})
 		}
 	}
@@ -35,8 +38,8 @@ export class ReactiveServiceInjector implements ReactiveInjector {
 			proxy: any,
 			proxyHandler: ObjectProxyHandler,
 		}>(null);
-		if(proxyRef.current === null) {
-			const instance = this.createService(service);
+		if (proxyRef.current === null) {
+			const instance = this.ensureServiceIsCreated(service);
 			const proxyHandler = new ObjectProxyHandler(instance.name, instance.dispatcher, new Set())
 			proxyRef.current = {
 				proxy: new Proxy(instance.instance, proxyHandler),
@@ -48,7 +51,7 @@ export class ReactiveServiceInjector implements ReactiveInjector {
 
 		const [, forceUpdate] = useState({});
 		useEffect(() => {
-			const sub = proxyHandler.dispatcher.listen((path) => {
+			const sub = proxyHandler.dispatcher.listen(({path}) => {
 				if (proxyHandler.listenFor.has(path)) {
 					debug('-handle ' + true, proxyHandler.listenFor, path);
 					forceUpdate({});
@@ -64,13 +67,30 @@ export class ReactiveServiceInjector implements ReactiveInjector {
 		return proxy;
 	}
 
-	private createService(service: any) {
+	private evalPath(path: string) {
+		const parts = path.split('.');
+		let service = this.ensureServiceIsCreated(parts[0]);
+
+		let object = service.instance;
+		let i = 1;
+		for (; i < parts.length - 1; i++) {
+			object = object[parts[i]];
+		}
+
+		return {
+			service,
+			object,
+			field: parts[parts.length - 1],
+		}
+	}
+
+	private ensureServiceIsCreated(service: any) {
 		const init = () => {
-			if((service as any)?.prototype?.constructor) {
+			if ((service as any)?.prototype?.constructor) {
 				try {
 					return new service(this);
 				} catch (e) {
-					if(!e || e.name !== 'TypeError' ||
+					if (!e || e.name !== 'TypeError' ||
 						!(typeof e.message === 'string' && e.message.endsWith('is not a constructor'))) {
 						throw e;
 					} else {
@@ -82,12 +102,16 @@ export class ReactiveServiceInjector implements ReactiveInjector {
 			}
 		}
 
-		const entry = this.cache.get(service);
-		if(!entry) {
+		if(typeof service === 'string') {
+			service = this.serviceNames.get(service);
+		}
+
+		const entry = this.services.get(service);
+		if (!entry) {
 			throw new Error('Unregistered service ' + service);
 		}
 
-		if(entry.instance === undefined) {
+		if (entry.instance === undefined) {
 			entry.instance = init();
 		}
 
@@ -102,17 +126,17 @@ class ObjectProxyHandler implements ProxyHandler<any> {
 	constructor(
 		public readonly path: string,
 		public readonly dispatcher: Dispatcher,
-		public readonly listenFor: Set<string>
+		public readonly listenFor: Set<string>,
 	) {
 	}
 
 	get(target: object, p: string | symbol, receiver: any): any {
 		let result;
-		const propPath = this.pathForProp(p, Array.isArray(target));
+		const propPath = this.pathForProp(p);
 		if (typeof target[p] === 'function') {
 			result = target[p];
 		} else if (target[p] !== null && typeof target[p] === 'object') {
-			if(!this.proxies.has(target[p]) || this.proxies.get(target[p]) == null) {
+			if (!this.proxies.has(target[p]) || this.proxies.get(target[p]) == null) {
 				this.proxies.set(target[p], new Proxy(target[p], new ObjectProxyHandler(propPath, this.dispatcher, this.listenFor)));
 			}
 			result = this.proxies.get(target[p]);
@@ -130,45 +154,41 @@ class ObjectProxyHandler implements ProxyHandler<any> {
 
 	set(target: object, p: string | symbol, newValue: any, receiver: any): boolean {
 		if (isInReactRendering()) {
-			throw new Error('Trying to improperly set property: "' + String(p) + '" during a rendering. This will cause an infinite loop and is not allowed. Full path is "' + this.pathForProp(p, false) + '"');
+			throw new Error('Trying to improperly set property: "' + String(p) + '" during a rendering. This will cause an infinite loop and is not allowed. Full path is "' + this.pathForProp(p) + '"');
 		}
-
-		if(!isInReactDispatching()) {
+		let oldValue = target[p];
+		if (!isInReactDispatching()) {
+			const path = this.pathForProp(p);
 			target[p] = newValue;
-			return true;
-		}
-
-		if(Array.isArray(target)) {
+			this.dispatcher.emit({ path, oldValue, newValue });
+		} else if (Array.isArray(target)) {
 			const preLen = target.length;
 			const oldVal = target[p];
 			target[p] = newValue;
-			const didChangeLen = target.length === preLen;
-
-			if(didChangeLen) {
-				const path = this.pathForProp('length', false);
-				debug('-Change', path);
-				this.dispatcher.emit(path);
-			}
 
 			if (oldVal !== newValue) {
-				const path = this.pathForProp(p, Array.isArray(target));
+				const path = this.pathForProp(p);
 				debug('-Change', path);
-				this.dispatcher.emit(path);
+				this.dispatcher.emit({ path, oldValue, newValue });
+			}
+
+			if (target.length !== preLen) {
+				const path = this.pathForProp('length');
+				debug('-Change', path);
+				this.dispatcher.emit({ path, oldValue: preLen, newValue: target.length });
 			}
 		} else {
-			const oldVal = target[p];
 			target[p] = newValue;
-			if (oldVal !== newValue) {
-				const path = this.pathForProp(p, Array.isArray(target));
+			if (oldValue !== newValue) {
+				const path = this.pathForProp(p);
 				debug('-Change', path);
-				this.dispatcher.emit(path);
+				this.dispatcher.emit({ path, oldValue, newValue });
 			}
 		}
 		return true;
 	}
 
-	private pathForProp(key: string | symbol, isArray: boolean) {
-		// if(isArray) return this.path;
+	private pathForProp(key: string | symbol) {
 		return this.path + '.' + String(key)
 	}
 }

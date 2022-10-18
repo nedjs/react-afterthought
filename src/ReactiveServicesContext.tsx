@@ -9,16 +9,17 @@ export function ReactiveServicesProvider(props: {
 	services: Record<string, ReactiveService>
 	children: JSX.Element
 }) {
-
-	const injector = new ReactiveServiceInjector(props.services);
-	if(props.injectorRef) {
-		if(typeof props.injectorRef === 'function') {
-			props.injectorRef(injector);
-		} else {
-			(props.injectorRef as MutableRefObject<ReactiveServiceInjector>).current = injector;
+	const injectorRef = useRef(new ReactiveServiceInjector(props.services));
+	useEffect(() => {
+		if(props.injectorRef) {
+			if(typeof props.injectorRef === 'function') {
+				props.injectorRef(injectorRef.current);
+			} else {
+				(props.injectorRef as MutableRefObject<ReactiveServiceInjector>).current = injectorRef.current;
+			}
 		}
-	}
-	return <ReactiveServicesContext.Provider value={injector}>
+	}, [])
+	return <ReactiveServicesContext.Provider value={injectorRef.current}>
 		{props.children}
 	</ReactiveServicesContext.Provider>
 }

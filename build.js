@@ -15,9 +15,10 @@ esbuild.build({
     platform: 'node',
     target: ['es2019'],
     define: { __DEV__: isDev },
+}).then(v => {
+    console.log('cjs build finished')
 }).catch((e) => {
     throw e;
-    process.exit(1)
 })
 
 esbuild.build({
@@ -32,7 +33,8 @@ esbuild.build({
     platform: 'node',
     target: ['es2019'],
     define: { __DEV__: isDev },
+}).then(v => {
+    console.log('esm build finished')
 }).catch((e) => {
     throw e;
-    process.exit(1)
 })
