@@ -1,0 +1,6 @@
+.idea
+.vscode
+dist/
+yarn-error.log
+reactive-services-*.tgz
+node_modules
