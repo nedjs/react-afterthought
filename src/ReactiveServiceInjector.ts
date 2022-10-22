@@ -1,30 +1,33 @@
 import {useEffect, useRef, useState} from "react";
 import {
 	ReactiveInjector,
-	ReactiveService,
 	ReactiveServiceInstance,
-	ServiceHistory
+	ReactiveServices,
+	ClassConstructor, ValidServiceKey, ValidServiceType
 } from "./types";
 import {currentRenderingComponentName, debug, isInReactDispatching, isInReactRendering} from "./util/helpers";
-import {Dispatcher, DispatchHandler} from "./util/Dispatcher";
+import {Dispatcher} from "./util/Dispatcher";
+import {ReactiveService, SERVICE_INIT} from "./ReactiveService";
 
 
-export class ReactiveServiceInjector implements ReactiveInjector {
+export class ReactiveServiceInjector<TServices = ReactiveServices> implements ReactiveInjector<TServices> {
 	private readonly serviceNames = new Map<string, any>();
-	private readonly services = new Map<any, {
+	private readonly serviceInstances = new Map<any, {
 		instance?: any,
 		type: any,
 		name: string,
 		dispatcher: Dispatcher,
 	}>;
 
+	public readonly services = new Proxy({}, new ServicesProxyHandler(this));
+
 	constructor(
-		config: Record<string, ReactiveService>
+		config: Record<string, ValidServiceType>
 	) {
 		for (let key in config) {
 			this.serviceNames.set(key, config[key]);
 
-			this.services.set(config[key], {
+			this.serviceInstances.set(config[key], {
 				instance: undefined,
 				type: config[key],
 				name: key,
@@ -33,18 +36,17 @@ export class ReactiveServiceInjector implements ReactiveInjector {
 		}
 	}
 
-	getService<T extends ReactiveService>(service: T): ReactiveServiceInstance<T> {
+
+	getService<T extends ClassConstructor>(service: ValidServiceKey): ReactiveServiceInstance<T, TServices> {
+		if (!isInReactRendering()) {
+			return this.initServiceProxy(service).proxy;
+		}
 		const proxyRef = useRef<{
 			proxy: any,
 			proxyHandler: ObjectProxyHandler,
 		}>(null);
 		if (proxyRef.current === null) {
-			const instance = this.ensureServiceIsCreated(service);
-			const proxyHandler = new ObjectProxyHandler(instance.name, instance.dispatcher, new Set())
-			proxyRef.current = {
-				proxy: new Proxy(instance.instance, proxyHandler),
-				proxyHandler,
-			};
+			proxyRef.current = this.initServiceProxy(service);
 		}
 
 		const {proxyHandler, proxy} = proxyRef.current;
@@ -67,28 +69,13 @@ export class ReactiveServiceInjector implements ReactiveInjector {
 		return proxy;
 	}
 
-	private evalPath(path: string) {
-		const parts = path.split('.');
-		let service = this.ensureServiceIsCreated(parts[0]);
-
-		let object = service.instance;
-		let i = 1;
-		for (; i < parts.length - 1; i++) {
-			object = object[parts[i]];
-		}
-
-		return {
-			service,
-			object,
-			field: parts[parts.length - 1],
-		}
-	}
-
-	private ensureServiceIsCreated(service: any) {
+	private initServiceProxy(service: ValidServiceKey) {
 		const init = () => {
-			if ((service as any)?.prototype?.constructor) {
+			if (typeof service === "string") return null;
+
+			if (this.isConstructor(service)) {
 				try {
-					return new service(this);
+					return new service();
 				} catch (e) {
 					if (!e || e.name !== 'TypeError' ||
 						!(typeof e.message === 'string' && e.message.endsWith('is not a constructor'))) {
@@ -102,23 +89,55 @@ export class ReactiveServiceInjector implements ReactiveInjector {
 			}
 		}
 
-		if(typeof service === 'string') {
+		if (typeof service === 'string') {
 			service = this.serviceNames.get(service);
 		}
 
-		const entry = this.services.get(service);
+		const entry = this.serviceInstances.get(service);
 		if (!entry) {
 			throw new Error('Unregistered service ' + service);
 		}
 
 		if (entry.instance === undefined) {
 			entry.instance = init();
+			if (entry.instance[SERVICE_INIT]) {
+				entry.instance[SERVICE_INIT](this);
+			}
 		}
 
-		return entry;
+
+		const proxyHandler = new ObjectProxyHandler(entry.name, entry.dispatcher, new Set())
+
+		return {
+			proxy: new Proxy(entry.instance, proxyHandler),
+			proxyHandler,
+		};
+	}
+
+
+	private isConstructor(v: any): v is new() => any {
+		return typeof v === 'function' && v?.prototype?.constructor
 	}
 }
 
+class ServicesProxyHandler implements ProxyHandler<any> {
+	constructor(
+		private readonly injector: ReactiveInjector
+	) {
+	}
+
+	get(target: any, p: string | symbol, receiver: any): any {
+		if (typeof p === 'string') {
+			return this.injector.getService(p);
+		} else {
+			return target[p];
+		}
+	}
+
+	set(target: any, p: string | symbol, newValue: any, receiver: any): boolean {
+		throw new Error('Cannot set a service here, services must be registered.')
+	}
+}
 
 class ObjectProxyHandler implements ProxyHandler<any> {
 	public readonly proxies = new WeakMap<any, any>();
@@ -131,6 +150,11 @@ class ObjectProxyHandler implements ProxyHandler<any> {
 	}
 
 	get(target: object, p: string | symbol, receiver: any): any {
+		if (target instanceof ReactiveService && ReactiveService.prototype.hasOwnProperty(p)) {
+			// dont proxy types which exist on ReactiveService
+			return target[p];
+		}
+
 		let result;
 		const propPath = this.pathForProp(p);
 		if (typeof target[p] === 'function') {
@@ -160,7 +184,7 @@ class ObjectProxyHandler implements ProxyHandler<any> {
 		if (!isInReactDispatching()) {
 			const path = this.pathForProp(p);
 			target[p] = newValue;
-			this.dispatcher.emit({ path, oldValue, newValue });
+			this.dispatcher.emit({path, oldValue, newValue});
 		} else if (Array.isArray(target)) {
 			const preLen = target.length;
 			const oldVal = target[p];
@@ -169,20 +193,20 @@ class ObjectProxyHandler implements ProxyHandler<any> {
 			if (oldVal !== newValue) {
 				const path = this.pathForProp(p);
 				debug('-Change', path);
-				this.dispatcher.emit({ path, oldValue, newValue });
+				this.dispatcher.emit({path, oldValue, newValue});
 			}
 
 			if (target.length !== preLen) {
 				const path = this.pathForProp('length');
 				debug('-Change', path);
-				this.dispatcher.emit({ path, oldValue: preLen, newValue: target.length });
+				this.dispatcher.emit({path, oldValue: preLen, newValue: target.length});
 			}
 		} else {
 			target[p] = newValue;
 			if (oldValue !== newValue) {
 				const path = this.pathForProp(p);
 				debug('-Change', path);
-				this.dispatcher.emit({ path, oldValue, newValue });
+				this.dispatcher.emit({path, oldValue, newValue});
 			}
 		}
 		return true;

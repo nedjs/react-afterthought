@@ -1,7 +1,8 @@
 import {useReactiveInjector} from "./useReactiveInjector";
-import {ReactiveService, ReactiveServiceInstance} from "../types";
+import {ClassConstructor, ReactiveServiceInstance, ReactiveServices, ValidServiceKey} from "../types";
+import {ReactiveService} from "../ReactiveService";
 
-export function useReactiveService<T extends ReactiveService>(service: T): ReactiveServiceInstance<T> {
-	const contextValue = useReactiveInjector();
+export function useReactiveService<T extends ValidServiceKey, TServices = ReactiveServices>(service: T): ReactiveServiceInstance<T, TServices> {
+	const contextValue = useReactiveInjector<TServices>();
 	return contextValue.getService(service);
 }

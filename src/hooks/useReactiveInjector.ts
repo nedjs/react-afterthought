@@ -1,7 +1,8 @@
 import {useContext} from "react";
 import {ReactiveServicesContext} from "../ReactiveServicesContext";
+import {ReactiveInjector, ReactiveServices} from "../types";
 
-export function useReactiveInjector() {
+export function useReactiveInjector<TService = ReactiveServices>() {
 	const contextValue = useContext(ReactiveServicesContext)
 
 	if (__DEV__ && !contextValue) {
@@ -10,5 +11,5 @@ export function useReactiveInjector() {
 		)
 	}
 
-	return contextValue;
+	return contextValue as ReactiveInjector<TService>;
 }

@@ -1,16 +1,19 @@
-import {DispatchHandler} from "./util/Dispatcher";
-
 declare global {
 	const __DEV__: boolean;
 }
 
-export interface ServiceConstructor {
-	new()
-	new(injector: ReactiveInjector)
+export interface ClassConstructor {
+	new(): any
 }
 
-export type ReactiveService = ServiceConstructor | object;
-export type ReactiveServiceInstance<T> = T extends (new (...args: any[]) => infer U) ? U : T;
+export type ValidServiceKey = ClassConstructor | object | string;
+export type ValidServiceType = ClassConstructor | object;
+
+export type ReactiveServiceInstance<T, TServices extends ReactiveServices> =
+	T extends keyof ReactiveServices ?
+		ReactiveServices[T] :
+		T extends (new (...args: any[]) => infer U) ? U :
+			T;
 
 /**
  * @internal
@@ -21,6 +24,11 @@ export interface ServiceHistory {
 	newValue: any;
 }
 
-export interface ReactiveInjector {
-	getService<T extends ReactiveService>(service: T): ReactiveServiceInstance<T>
+export interface ReactiveServices {
+
+}
+
+export interface ReactiveInjector<TServices = ReactiveServices> {
+	services: TServices;
+	getService<T extends ValidServiceKey>(service: T): ReactiveServiceInstance<T, TServices>
 }

@@ -8,7 +8,6 @@ import React from "react";
  */
 export function isInReactRendering(): boolean {
 	// Not sure how to correctly get this without being a React internal developer
-	// return React.useEffect !== React.useState;
 	return !!React['__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED'].ReactCurrentOwner.current;
 }
 

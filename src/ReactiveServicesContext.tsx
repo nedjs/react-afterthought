@@ -1,12 +1,12 @@
-import React, {createContext, MutableRefObject, Ref, RefObject, useEffect, useRef, useState} from "react";
-import {ServiceConstructor, ReactiveInjector, ReactiveService} from "./types";
+import React, {createContext, MutableRefObject, Ref, useEffect, useRef} from "react";
+import {ReactiveInjector, ValidServiceType} from "./types";
 import {ReactiveServiceInjector} from "./ReactiveServiceInjector";
 
 export const ReactiveServicesContext = createContext<ReactiveInjector>(null as any);
 
 export function ReactiveServicesProvider(props: {
 	injectorRef?: Ref<ReactiveServiceInjector>
-	services: Record<string, ReactiveService>
+	services: Record<string, ValidServiceType>
 	children: JSX.Element
 }) {
 	const injectorRef = useRef(new ReactiveServiceInjector(props.services));
