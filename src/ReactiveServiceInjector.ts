@@ -40,14 +40,14 @@ export class ReactiveServiceInjector<TServices = ReactiveServices> implements Re
 
 
 		if(__DEV__) {
-			this.dispatcher.listen(({path}) => {
+			this.dispatcher.subscribe(({path}) => {
 				debug('RS-Change', path);
 			})
 		}
 	}
 
-	listen(callback: DispatchHandler<ServiceHistory>): () => void {
-		return this.dispatcher.listen(callback);
+	subscribe(callback: DispatchHandler<ServiceHistory>): () => void {
+		return this.dispatcher.subscribe(callback);
 	}
 
 	getService<T extends ClassConstructor>(service: ValidServiceKey): ReactiveServiceInstance<T, TServices> {

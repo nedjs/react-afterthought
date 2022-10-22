@@ -31,9 +31,9 @@ function CounterComponent() {
 }
 
 function App() {
-    return <ReactiveServicesProvider services={{CounterService}}>
+    return <ReactiveServicesRoot services={{CounterService}}>
         <CounterComponent />
-    </ReactiveServicesProvider>;
+    </ReactiveServicesRoot>;
 }
 
 const root = createRoot(document.getElementById('root'));

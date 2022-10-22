@@ -23,7 +23,7 @@ export function useReactiveService<T extends ValidServiceKey, TServices = Reacti
 
 	const [, forceUpdate] = useState({});
 	useEffect(() => {
-		const sub = contextValue.listen(({path}) => {
+		const sub = contextValue.subscribe(({path}) => {
 			const watchPaths = ReactiveService.getWatches(service);
 			if (watchPaths.has(path)) {
 				debug('RS-handle', watchPaths, path);

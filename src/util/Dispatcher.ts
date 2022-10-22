@@ -45,7 +45,7 @@ export class Dispatcher<T = ServiceHistory> {
 		}
 	}
 
-	listen(callback: DispatchHandler<T>) {
+	subscribe(callback: DispatchHandler<T>) {
 		const newNode = new ListNode(callback);
 
 		this.handlersHead.add(newNode);

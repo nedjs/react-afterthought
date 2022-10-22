@@ -29,6 +29,31 @@ export interface ReactiveServices {
 
 export interface ReactiveInjector<TServices = ReactiveServices> {
 	services: TServices;
-	listen(callback: DispatchHandler<ServiceHistory>): () => void;
+	subscribe(callback: DispatchHandler<ServiceHistory>): () => void;
 	getService<T extends ValidServiceKey>(service: T): ReactiveServiceInstance<T, TServices>
 }
+
+export type ValidServiceKey2<T> = ClassConstructor | object | keyof T;
+export type ReactiveServiceInstance2<T, TServices extends ReactiveServices> =
+	T extends keyof TServices ?
+		TServices[T] :
+			T extends (new (...args: any[]) => infer U) ? U :
+				T;
+
+function getIt<TServices = ReactiveServices>(v: keyof TServices | ClassConstructor | object): typeof v //ReactiveServiceInstance2<typeof v, TServices>
+{
+	return null as any;
+}
+
+interface LServices {
+	foo: Date
+}
+
+function inferIt<T = any>(v: T): typeof v {
+	return null as any;
+}
+
+const a = inferIt('s')
+
+const r = getIt<LServices>('foo');
+const r2: ReactiveServiceInstance2<typeof r, LServices> = null as any;
