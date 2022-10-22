@@ -5,7 +5,7 @@ export interface DispatchHandler<T> {
 }
 
 /**
- * Basic doubly linked list
+ * Basic doubly linked list, use this because it's easy to remove itself without affecting other nodes position
  */
 class ListNode<T> {
 	next?: ListNode<T>

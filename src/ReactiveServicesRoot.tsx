@@ -4,12 +4,13 @@ import {ReactiveServiceInjector} from "./ReactiveServiceInjector";
 
 export const ReactiveServicesContext = createContext<ReactiveInjector>(null as any);
 
-export function ReactiveServicesProvider(props: {
+export function ReactiveServicesRoot(props: {
 	injectorRef?: Ref<ReactiveServiceInjector>
 	services: Record<string, ValidServiceType>
 	children: JSX.Element
 }) {
 	const injectorRef = useRef(new ReactiveServiceInjector(props.services));
+
 	useEffect(() => {
 		if(props.injectorRef) {
 			if(typeof props.injectorRef === 'function') {
@@ -18,7 +19,8 @@ export function ReactiveServicesProvider(props: {
 				(props.injectorRef as MutableRefObject<ReactiveServiceInjector>).current = injectorRef.current;
 			}
 		}
-	}, [])
+	}, []);
+
 	return <ReactiveServicesContext.Provider value={injectorRef.current}>
 		{props.children}
 	</ReactiveServicesContext.Provider>

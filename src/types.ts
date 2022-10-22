@@ -1,3 +1,5 @@
+import {DispatchHandler} from "./util/Dispatcher";
+
 declare global {
 	const __DEV__: boolean;
 }
@@ -15,9 +17,6 @@ export type ReactiveServiceInstance<T, TServices extends ReactiveServices> =
 		T extends (new (...args: any[]) => infer U) ? U :
 			T;
 
-/**
- * @internal
- */
 export interface ServiceHistory {
 	path: string;
 	oldValue: any;
@@ -30,5 +29,6 @@ export interface ReactiveServices {
 
 export interface ReactiveInjector<TServices = ReactiveServices> {
 	services: TServices;
+	listen(callback: DispatchHandler<ServiceHistory>): () => void;
 	getService<T extends ValidServiceKey>(service: T): ReactiveServiceInstance<T, TServices>
 }

@@ -1,5 +1,5 @@
 import {useContext} from "react";
-import {ReactiveServicesContext} from "../ReactiveServicesContext";
+import {ReactiveServicesContext} from "../ReactiveServicesRoot";
 import {ReactiveInjector, ReactiveServices} from "../types";
 
 export function useReactiveInjector<TService = ReactiveServices>() {

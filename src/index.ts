@@ -1,11 +1,11 @@
 import {ReactiveServiceInjector} from './ReactiveServiceInjector';
 import {ReactiveService} from './ReactiveService';
-import {ReactiveServicesProvider, ReactiveServicesContext} from './ReactiveServicesContext';
+import {ReactiveServicesRoot, ReactiveServicesContext} from './ReactiveServicesRoot';
 
 export * from './types';
 export * from './hooks';
 export {
-	ReactiveServicesProvider,
+	ReactiveServicesRoot,
 	ReactiveServicesContext,
 	ReactiveServiceInjector,
 	ReactiveService,

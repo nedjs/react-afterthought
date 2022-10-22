@@ -7,6 +7,7 @@
   "module": "./dist/es/index.js",
   "scripts": {
     "build": "tsc -p . && node build.js && rollup -c && yarn run cp",
+    "build-dev": "tsc -p . && node build.js -dev && rollup -c && yarn run cp",
     "test": "echo \"Error: no test specified\" && exit 1",
     "cp": "cp -r dist /Users/nstuart/workdir/react-test/node_modules/reactive-services"
   },

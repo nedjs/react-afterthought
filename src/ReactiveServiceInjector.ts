@@ -1,22 +1,26 @@
-import {useEffect, useRef, useState} from "react";
 import {
 	ReactiveInjector,
 	ReactiveServiceInstance,
 	ReactiveServices,
-	ClassConstructor, ValidServiceKey, ValidServiceType
+	ClassConstructor, ValidServiceKey, ValidServiceType, ServiceHistory
 } from "./types";
-import {currentRenderingComponentName, debug, isInReactDispatching, isInReactRendering} from "./util/helpers";
-import {Dispatcher} from "./util/Dispatcher";
-import {ReactiveService, SERVICE_INIT} from "./ReactiveService";
+import {
+	currentRenderingComponentName,
+	debug,
+	isInReactDispatching,
+	RS_CONTEXT
+} from "./util/helpers";
+import {Dispatcher, DispatchHandler} from "./util/Dispatcher";
+import {ReactiveService, SYM_SERVICE_WATCHES, SYM_SERVICE_PATH} from "./ReactiveService";
 
 
 export class ReactiveServiceInjector<TServices = ReactiveServices> implements ReactiveInjector<TServices> {
 	private readonly serviceNames = new Map<string, any>();
+	private readonly dispatcher = new Dispatcher();
 	private readonly serviceInstances = new Map<any, {
-		instance?: any,
+		instance: any,
 		type: any,
 		name: string,
-		dispatcher: Dispatcher,
 	}>;
 
 	public readonly services = new Proxy({}, new ServicesProxyHandler(this));
@@ -28,67 +32,29 @@ export class ReactiveServiceInjector<TServices = ReactiveServices> implements Re
 			this.serviceNames.set(key, config[key]);
 
 			this.serviceInstances.set(config[key], {
-				instance: undefined,
+				instance: this.initService(config[key]),
 				type: config[key],
-				name: key,
-				dispatcher: new Dispatcher(),
+				name: key
+			})
+		}
+
+
+		if(__DEV__) {
+			this.dispatcher.listen(({path}) => {
+				debug('RS-Change', path);
 			})
 		}
 	}
 
+	listen(callback: DispatchHandler<ServiceHistory>): () => void {
+		return this.dispatcher.listen(callback);
+	}
 
 	getService<T extends ClassConstructor>(service: ValidServiceKey): ReactiveServiceInstance<T, TServices> {
-		if (!isInReactRendering()) {
-			return this.initServiceProxy(service).proxy;
-		}
-		const proxyRef = useRef<{
-			proxy: any,
-			proxyHandler: ObjectProxyHandler,
-		}>(null);
-		if (proxyRef.current === null) {
-			proxyRef.current = this.initServiceProxy(service);
-		}
-
-		const {proxyHandler, proxy} = proxyRef.current;
-
-		const [, forceUpdate] = useState({});
-		useEffect(() => {
-			const sub = proxyHandler.dispatcher.listen(({path}) => {
-				if (proxyHandler.listenFor.has(path)) {
-					debug('-handle ' + true, proxyHandler.listenFor, path);
-					forceUpdate({});
-				} else {
-					debug('-handle ' + false, proxyHandler.listenFor, path);
-				}
-			});
-			return () => {
-				sub();
-			}
-		}, []);
-
-		return proxy;
+		return this.initServiceProxy(service).proxy;
 	}
 
 	private initServiceProxy(service: ValidServiceKey) {
-		const init = () => {
-			if (typeof service === "string") return null;
-
-			if (this.isConstructor(service)) {
-				try {
-					return new service();
-				} catch (e) {
-					if (!e || e.name !== 'TypeError' ||
-						!(typeof e.message === 'string' && e.message.endsWith('is not a constructor'))) {
-						throw e;
-					} else {
-						return service;
-					}
-				}
-			} else {
-				return service;
-			}
-		}
-
 		if (typeof service === 'string') {
 			service = this.serviceNames.get(service);
 		}
@@ -98,15 +64,7 @@ export class ReactiveServiceInjector<TServices = ReactiveServices> implements Re
 			throw new Error('Unregistered service ' + service);
 		}
 
-		if (entry.instance === undefined) {
-			entry.instance = init();
-			if (entry.instance[SERVICE_INIT]) {
-				entry.instance[SERVICE_INIT](this);
-			}
-		}
-
-
-		const proxyHandler = new ObjectProxyHandler(entry.name, entry.dispatcher, new Set())
+		const proxyHandler = new ObjectProxyHandler(entry.name, this.dispatcher)
 
 		return {
 			proxy: new Proxy(entry.instance, proxyHandler),
@@ -114,6 +72,26 @@ export class ReactiveServiceInjector<TServices = ReactiveServices> implements Re
 		};
 	}
 
+	private initService(service: ClassConstructor | object) {
+		let instance;
+		if (this.isConstructor(service)) {
+			try {
+				instance = new service();
+			} catch (e) {
+				if (!e || e.name !== 'TypeError' ||
+					!(typeof e.message === 'string' && e.message.endsWith('is not a constructor'))) {
+					throw e;
+				} else {
+					instance = service;
+				}
+			}
+		} else {
+			instance = service;
+		}
+
+		ReactiveService.init(instance, this);
+		return instance;
+	}
 
 	private isConstructor(v: any): v is new() => any {
 		return typeof v === 'function' && v?.prototype?.constructor
@@ -145,14 +123,21 @@ class ObjectProxyHandler implements ProxyHandler<any> {
 	constructor(
 		public readonly path: string,
 		public readonly dispatcher: Dispatcher,
-		public readonly listenFor: Set<string>,
+		public readonly watchPaths: Set<string> = new Set(),
 	) {
 	}
 
 	get(target: object, p: string | symbol, receiver: any): any {
 		if (target instanceof ReactiveService && ReactiveService.prototype.hasOwnProperty(p)) {
 			// dont proxy types which exist on ReactiveService
+			if(p === 'services') {
+
+			}
 			return target[p];
+		} else if(p === SYM_SERVICE_WATCHES) {
+			return this.watchPaths;
+		} else if(p === SYM_SERVICE_PATH) {
+			return this.path;
 		}
 
 		let result;
@@ -161,23 +146,25 @@ class ObjectProxyHandler implements ProxyHandler<any> {
 			result = target[p];
 		} else if (target[p] !== null && typeof target[p] === 'object') {
 			if (!this.proxies.has(target[p]) || this.proxies.get(target[p]) == null) {
-				this.proxies.set(target[p], new Proxy(target[p], new ObjectProxyHandler(propPath, this.dispatcher, this.listenFor)));
+				this.proxies.set(target[p], new Proxy(target[p], new ObjectProxyHandler(propPath, this.dispatcher, this.watchPaths)));
 			}
 			result = this.proxies.get(target[p]);
 		} else {
 			result = target[p];
 		}
 
-		if (isInReactRendering()) {
-			debug('-listen', currentRenderingComponentName(), propPath);
-			this.listenFor.add(propPath);
+		if (RS_CONTEXT.current) {
+			debug('RS-listen:', currentRenderingComponentName(), propPath);
+			ReactiveService.getWatches(RS_CONTEXT.current).add(propPath);
+		} else {
+			debug('RS-ignore:', currentRenderingComponentName(), propPath);
 		}
 
 		return result;
 	}
 
 	set(target: object, p: string | symbol, newValue: any, receiver: any): boolean {
-		if (isInReactRendering()) {
+		if (RS_CONTEXT.current) {
 			throw new Error('Trying to improperly set property: "' + String(p) + '" during a rendering. This will cause an infinite loop and is not allowed. Full path is "' + this.pathForProp(p) + '"');
 		}
 		let oldValue = target[p];
@@ -192,20 +179,17 @@ class ObjectProxyHandler implements ProxyHandler<any> {
 
 			if (oldVal !== newValue) {
 				const path = this.pathForProp(p);
-				debug('-Change', path);
 				this.dispatcher.emit({path, oldValue, newValue});
 			}
 
 			if (target.length !== preLen) {
 				const path = this.pathForProp('length');
-				debug('-Change', path);
 				this.dispatcher.emit({path, oldValue: preLen, newValue: target.length});
 			}
 		} else {
 			target[p] = newValue;
 			if (oldValue !== newValue) {
 				const path = this.pathForProp(p);
-				debug('-Change', path);
 				this.dispatcher.emit({path, oldValue, newValue});
 			}
 		}
