@@ -1,7 +1,19 @@
 {
   "name": "react-afterthought",
-  "version": "0.0.6-beta",
-  "description": "",
+  "version": "0.0.7-beta",
+  "description": "Service based React state management",
+  "homepage": "https://github.com/nedjs/react-afterthought/",
+  "bugs": "https://github.com/nedjs/react-afterthought/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nedjs/react-afterthought.git"
+  },
+  "keywords": ["react", "state", "services", "afterthought"],
+  "author": "Ned Stuart",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
   "main": "./dist/cjs/index.js",
   "types": "./dist/types/index.d.ts",
   "module": "./dist/es/index.js",
@@ -11,12 +23,6 @@
     "build-dev": "tsc -p . && node build.js -dev && rollup -c",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "Ned Stuart",
-  "license": "ISC",
-  "files": [
-    "dist"
-  ],
   "peerDependencies": {
     "react": ">=16.8"
   },
