@@ -1,13 +1,13 @@
-import {useReactiveInjector} from "./useReactiveInjector";
-import {ClassConstructor, ReactiveServiceInstance, ReactiveServices, ValidServiceKey} from "../types";
-import {ReactiveService} from "../ReactiveService";
+import {useInjector} from "./useInjector";
+import {ToServiceInstance, AfterthoughtServices, ValidServiceKey} from "../types";
+import {AfterthoughtService} from "../AfterthoughtService";
 import {useEffect, useLayoutEffect, useRef, useState} from "react";
 import {debug, RS_CONTEXT} from "../util/helpers";
 
-export function useReactiveService<T extends ValidServiceKey, TServices = ReactiveServices>(serviceType: T): ReactiveServiceInstance<T, TServices> {
-	const contextValue = useReactiveInjector<TServices>();
+export function useService<TServices = AfterthoughtServices, T extends ValidServiceKey<TServices> = never>(serviceType: T): ToServiceInstance<T, TServices> {
+	const contextValue = useInjector<TServices>();
 
-	const serviceRef = useRef<T>(null);
+	const serviceRef = useRef<any>(null);
 	if (serviceRef.current === null) {
 		serviceRef.current = contextValue.getService(serviceType);
 	}
@@ -24,12 +24,12 @@ export function useReactiveService<T extends ValidServiceKey, TServices = Reacti
 	const [, forceUpdate] = useState({});
 	useEffect(() => {
 		const sub = contextValue.subscribe(({path}) => {
-			const watchPaths = ReactiveService.getWatches(service);
+			const watchPaths = AfterthoughtService.getWatches(service);
 			if (watchPaths.has(path)) {
 				debug('RS-handle', watchPaths, path);
 				forceUpdate({});
 			} else {
-				// debug('RS-handle ' + false, watchPaths, path);
+				debug('RS-see', watchPaths, path);
 			}
 		});
 		return () => {

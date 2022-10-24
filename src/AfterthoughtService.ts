@@ -1,14 +1,20 @@
-import {ReactiveInjector, ReactiveServices} from "./types";
+import {AfterthoughtInjector, AfterthoughtServices} from "./types";
 
 /**
  * @internal - Private method for internal use only
  */
 export const SYM_SERVICE_INIT = Symbol('rs_init');
 
+/**
+ * @internal - Private method for internal use only
+ */
 export const SYM_SERVICE_WATCHES = Symbol('rs_watches');
+/**
+ * @internal - Private method for internal use only
+ */
 export const SYM_SERVICE_PATH = Symbol('rs_path');
 
-export class ReactiveService<TServices = ReactiveServices> {
+export class AfterthoughtService<TServices = AfterthoughtServices> {
 
 	private _services: TServices;
 
@@ -20,11 +26,11 @@ export class ReactiveService<TServices = ReactiveServices> {
 	 * @internal
 	 * @param injector
 	 */
-	[SYM_SERVICE_INIT](injector: ReactiveInjector) {
+	[SYM_SERVICE_INIT](injector: AfterthoughtInjector<any>) {
 		this._services = injector.services as any;
 	}
 
-	static init(service: any, injector: ReactiveInjector) {
+	static init(service: any, injector: AfterthoughtInjector<any>) {
 		if(service[SYM_SERVICE_INIT]) {
 			service[SYM_SERVICE_INIT](injector);
 		}

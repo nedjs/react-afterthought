@@ -8,14 +8,22 @@ export interface ClassConstructor {
 	new(): any
 }
 
-export type ValidServiceKey = ClassConstructor | object | string;
-export type ValidServiceType = ClassConstructor | object;
+export type ValidServiceKey<TServices = AfterthoughtServices> = ClassConstructor | object | keyof TServices;
 
-export type ReactiveServiceInstance<T, TServices extends ReactiveServices> =
-	T extends keyof ReactiveServices ?
-		ReactiveServices[T] :
-		T extends (new (...args: any[]) => infer U) ? U :
-			T;
+
+export type ServiceDefinitions<TServices>= {
+	[k in keyof TServices]: ClassConstructor | object
+}
+export type ServiceInstances<TServices> = {
+	[K in keyof TServices]: ToServiceInstance<TServices[K], TServices>;
+}
+
+export type UnwrapConstructor<T> = & T extends (new (...args: any[]) => infer U) ? U : T;
+
+export type ToServiceInstance<T, TServices> = &
+	T extends keyof TServices ?
+		UnwrapConstructor<TServices[T]> :
+		UnwrapConstructor<T>;
 
 export interface ServiceHistory {
 	path: string;
@@ -23,37 +31,17 @@ export interface ServiceHistory {
 	newValue: any;
 }
 
-export interface ReactiveServices {
-
+export interface AfterthoughtServices {
 }
 
-export interface ReactiveInjector<TServices = ReactiveServices> {
-	services: TServices;
+export interface AfterthoughtInjector<TServices = AfterthoughtServices> {
+	services: ServiceInstances<TServices>;
 	subscribe(callback: DispatchHandler<ServiceHistory>): () => void;
-	getService<T extends ValidServiceKey>(service: T): ReactiveServiceInstance<T, TServices>
+	getService<T extends ValidServiceKey<TServices>>(service: T): ToServiceInstance<T, TServices>;
 }
 
-export type ValidServiceKey2<T> = ClassConstructor | object | keyof T;
-export type ReactiveServiceInstance2<T, TServices extends ReactiveServices> =
+export type ReactiveServiceInstance2<T, TServices extends AfterthoughtServices> =
 	T extends keyof TServices ?
 		TServices[T] :
 			T extends (new (...args: any[]) => infer U) ? U :
 				T;
-
-function getIt<TServices = ReactiveServices>(v: keyof TServices | ClassConstructor | object): typeof v //ReactiveServiceInstance2<typeof v, TServices>
-{
-	return null as any;
-}
-
-interface LServices {
-	foo: Date
-}
-
-function inferIt<T = any>(v: T): typeof v {
-	return null as any;
-}
-
-const a = inferIt('s')
-
-const r = getIt<LServices>('foo');
-const r2: ReactiveServiceInstance2<typeof r, LServices> = null as any;

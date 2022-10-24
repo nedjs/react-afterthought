@@ -12,18 +12,20 @@ npm install reactive-serivces
 
 ### Basic usage
 
-```js
+Here we create a simple counter and an increment button.
 
+```js
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import {ReactiveServicesProvider, useReactiveService} from "reactive-services";
+import {AfterthoughtProvider, useService} from "react-afterthought";
 
+// can be a class or object
 class CounterService {
     number = 0;
 }
 
 function CounterComponent() {
-    const counterService = useReactiveService(CounterService);
+    const counterService = useService(CounterService);
     return <div>
         <p>Count: {counterService.number}</p>
         <button onClick={() => counterService.number++}>Increment</button>
@@ -31,9 +33,9 @@ function CounterComponent() {
 }
 
 function App() {
-    return <ReactiveServicesRoot services={{CounterService}}>
+    return <AfterthoughtProvider services={{CounterService}}>
         <CounterComponent />
-    </ReactiveServicesRoot>;
+    </AfterthoughtProvider>;
 }
 
 const root = createRoot(document.getElementById('root'));

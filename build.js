@@ -3,11 +3,24 @@ const esbuild = require('esbuild');
 const isDev = Boolean(process.argv.find(v => v === '-dev'));
 const minify = !isDev;
 
+let drop = [], pure = [];
+if(isDev) {
+    // drop = [
+    //     'debugger',
+    //     'console.debug'
+    // ];
+    pure = [
+        'console.debug'
+    ];
+}
+
 esbuild.build({
     entryPoints: ['src/index.ts'],
     bundle: true,
     sourcemap: true,
     treeShaking: true,
+    drop,
+    pure,
     minify: minify,
     outfile: 'dist/cjs/index.js',
     external: ['react'],

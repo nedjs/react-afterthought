@@ -1,7 +1,7 @@
-import { useReactiveInjector } from "./useReactiveInjector";
-import { useReactiveService } from "./useReactiveService";
+import { useInjector } from "./useInjector";
+import { useService } from "./useService";
 
 export {
-	useReactiveInjector,
-	useReactiveService,
+	useInjector,
+	useService,
 }

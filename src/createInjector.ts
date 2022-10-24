@@ -1,8 +1,8 @@
 import {
-	ReactiveInjector,
-	ReactiveServiceInstance,
-	ReactiveServices,
-	ClassConstructor, ValidServiceKey, ValidServiceType, ServiceHistory
+	AfterthoughtInjector,
+	ToServiceInstance,
+	AfterthoughtServices,
+	ClassConstructor, ValidServiceKey, ServiceHistory, ServiceInstances, ServiceDefinitions
 } from "./types";
 import {
 	currentRenderingComponentName,
@@ -11,10 +11,14 @@ import {
 	RS_CONTEXT
 } from "./util/helpers";
 import {Dispatcher, DispatchHandler} from "./util/Dispatcher";
-import {ReactiveService, SYM_SERVICE_WATCHES, SYM_SERVICE_PATH} from "./ReactiveService";
+import {AfterthoughtService, SYM_SERVICE_WATCHES, SYM_SERVICE_PATH} from "./AfterthoughtService";
 
 
-export class ReactiveServiceInjector<TServices = ReactiveServices> implements ReactiveInjector<TServices> {
+export function createInjector<TServices = AfterthoughtServices>(services: TServices): AfterthoughtInjector<TServices> {
+	return new CreateInjector<TServices>(services as any)
+}
+
+class CreateInjector<TServices = AfterthoughtServices> implements AfterthoughtInjector<TServices> {
 	private readonly serviceNames = new Map<string, any>();
 	private readonly dispatcher = new Dispatcher();
 	private readonly serviceInstances = new Map<any, {
@@ -23,10 +27,10 @@ export class ReactiveServiceInjector<TServices = ReactiveServices> implements Re
 		name: string,
 	}>;
 
-	public readonly services = new Proxy({}, new ServicesProxyHandler(this));
+	public readonly services: ServiceInstances<TServices> = new Proxy({}, new ServicesProxyHandler(this as AfterthoughtInjector<any>));
 
 	constructor(
-		config: Record<string, ValidServiceType>
+		config: ServiceDefinitions<TServices>
 	) {
 		for (let key in config) {
 			this.serviceNames.set(key, config[key]);
@@ -50,18 +54,18 @@ export class ReactiveServiceInjector<TServices = ReactiveServices> implements Re
 		return this.dispatcher.subscribe(callback);
 	}
 
-	getService<T extends ClassConstructor>(service: ValidServiceKey): ReactiveServiceInstance<T, TServices> {
+	getService<T extends ValidServiceKey<TServices>>(service: T): ToServiceInstance<T, TServices> {
 		return this.initServiceProxy(service).proxy;
 	}
 
-	private initServiceProxy(service: ValidServiceKey) {
+	private initServiceProxy(service: ValidServiceKey<TServices>) {
 		if (typeof service === 'string') {
 			service = this.serviceNames.get(service);
 		}
 
 		const entry = this.serviceInstances.get(service);
 		if (!entry) {
-			throw new Error('Unregistered service ' + service);
+			throw new Error('Unregistered service ' + String(service));
 		}
 
 		const proxyHandler = new ObjectProxyHandler(entry.name, this.dispatcher)
@@ -89,7 +93,7 @@ export class ReactiveServiceInjector<TServices = ReactiveServices> implements Re
 			instance = service;
 		}
 
-		ReactiveService.init(instance, this);
+		AfterthoughtService.init(instance, this as AfterthoughtInjector<any>);
 		return instance;
 	}
 
@@ -100,7 +104,7 @@ export class ReactiveServiceInjector<TServices = ReactiveServices> implements Re
 
 class ServicesProxyHandler implements ProxyHandler<any> {
 	constructor(
-		private readonly injector: ReactiveInjector
+		private readonly injector: AfterthoughtInjector<any>
 	) {
 	}
 
@@ -128,7 +132,7 @@ class ObjectProxyHandler implements ProxyHandler<any> {
 	}
 
 	get(target: object, p: string | symbol, receiver: any): any {
-		if (target instanceof ReactiveService && ReactiveService.prototype.hasOwnProperty(p)) {
+		if (target instanceof AfterthoughtService && AfterthoughtService.prototype.hasOwnProperty(p)) {
 			// dont proxy types which exist on ReactiveService
 			if(p === 'services') {
 
@@ -155,7 +159,7 @@ class ObjectProxyHandler implements ProxyHandler<any> {
 
 		if (RS_CONTEXT.current) {
 			debug('RS-listen:', currentRenderingComponentName(), propPath);
-			ReactiveService.getWatches(RS_CONTEXT.current).add(propPath);
+			AfterthoughtService.getWatches(RS_CONTEXT.current).add(propPath);
 		} else {
 			debug('RS-ignore:', currentRenderingComponentName(), propPath);
 		}
