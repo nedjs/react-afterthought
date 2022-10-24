@@ -1,11 +1,13 @@
-# `reactive-services`
+# `Afterthought`
 
-A reactive service is a `class` or `object` which will notify components of field changes. Only components which used the data will be asked to refresh.
+This project aims to add simple, service based global state management to a React project.
+Similar to other projects such as Redux except the state can contain functions themselves and communicate
+between each other easily.
 
 ## Installation
 
 ```sh
-npm install reactive-serivces
+npm install react-afterthought
 ```
 
 ## Usage

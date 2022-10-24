@@ -1,6 +1,5 @@
 .idea
 .vscode
-dist/
 yarn-error.log
 react-afterthought-*.tgz
 node_modules

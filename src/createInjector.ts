@@ -7,7 +7,6 @@ import {
 import {
 	currentRenderingComponentName,
 	debug,
-	isInReactDispatching,
 	RS_CONTEXT
 } from "./util/helpers";
 import {Dispatcher, DispatchHandler} from "./util/Dispatcher";
@@ -171,12 +170,9 @@ class ObjectProxyHandler implements ProxyHandler<any> {
 		if (RS_CONTEXT.current) {
 			throw new Error('Trying to improperly set property: "' + String(p) + '" during a rendering. This will cause an infinite loop and is not allowed. Full path is "' + this.pathForProp(p) + '"');
 		}
+
 		let oldValue = target[p];
-		if (!isInReactDispatching()) {
-			const path = this.pathForProp(p);
-			target[p] = newValue;
-			this.dispatcher.emit({path, oldValue, newValue});
-		} else if (Array.isArray(target)) {
+		if (Array.isArray(target)) {
 			const preLen = target.length;
 			const oldVal = target[p];
 			target[p] = newValue;
