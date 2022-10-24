@@ -14,7 +14,7 @@ npm install react-afterthought
 
 Here we create a simple counter and an increment button.
 
-```js
+```jsx
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import {AfterthoughtProvider, useService} from "react-afterthought";
@@ -44,8 +44,9 @@ root.render(<App />);
 
 ### Types of services:
 Services can be objects or classes:
-```js
+```jsx
 import {AfterthoughtInjector, AfterthoughtService, createInjector} from "react-afterthought";
+
 class Service {
     number = 1
 }
@@ -65,13 +66,13 @@ const Service = {
 ### Registering services
 
 Registering a service can be done using the injector or just dropped into the provider:
-```js
-// Then use with basic provider
+```jsx
+// inline service delcaration
 <AfterthoughtProvider services={{ Service }}>
     ...
 </AfterthoughtProvider>
 
-// Then use service with injector
+// using injector to access services outside components
 const injector = createInjector({ Service });
 <AfterthoughtProvider injector={injector}>
     ...
@@ -84,7 +85,7 @@ const injector = createInjector({ Service });
 Say you have exiting code or code which needs to interact with a service and notify your
 React components of changes. This should be done by using the `injector`:
 
-```js
+```jsx
 // can be a class or object
 class CounterService {
     seconds = 0;
@@ -112,3 +113,41 @@ setInterval(() => {
     // injector.services.CounterService.seconds++;
 }, 1000)
 ```
+
+### Decoupling depdencies
+
+You might encounter circular dependencies or many things importing your services and
+not want to couple your service import to your component. To resolve this you may also
+reference your services by their name. For instance
+
+```jsx
+// Register MyService under the name myService
+<AfterthoughtProvider services={{ myService: MyService }}>
+    ...
+</AfterthoughtProvider>
+
+// You can now access this by its string name
+useService('myService');
+// or
+injector.getService('myService')
+// or
+injector.services.myService
+```
+
+### Typescript usage
+
+Most projects only contain one provider and the types are global. You can declare your
+service types on the global namespace by extending the `AfterthoughtServices` interface.
+This is the default type for all services.
+
+```ts
+const injector = createInjector({ CounterService })
+
+type ProjectServices = typeof injector.services;
+
+declare module "react-afterthought" {
+    interface AfterthoughtServices extends ProjectServices {
+    }
+}
+``` 
+
