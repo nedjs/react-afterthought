@@ -1,4 +1,5 @@
 import {DispatchHandler} from "./util/Dispatcher";
+import {ReactRenderingTracker} from "./util/helpers";
 
 declare global {
 	const __DEV__: boolean;
@@ -18,7 +19,7 @@ export type ServiceInstances<TServices> = {
 	[K in keyof TServices]: ToServiceInstance<TServices[K], TServices>;
 }
 
-export type UnwrapConstructor<T> = & T extends (new (...args: any[]) => infer U) ? U : T;
+export type UnwrapConstructor<T> = & T extends (new (...args: any[]) => infer U) ? U : T extends object ? T : never;
 
 export type ToServiceInstance<T, TServices> = &
 	T extends keyof TServices ?
@@ -38,10 +39,7 @@ export interface AfterthoughtInjector<TServices = AfterthoughtServices> {
 	services: ServiceInstances<TServices>;
 	subscribe(callback: DispatchHandler<ServiceHistory>): () => void;
 	getService<T extends ValidServiceKey<TServices>>(service: T): ToServiceInstance<T, TServices>;
-}
 
-export type ReactiveServiceInstance2<T, TServices extends AfterthoughtServices> =
-	T extends keyof TServices ?
-		TServices[T] :
-			T extends (new (...args: any[]) => infer U) ? U :
-				T;
+	/* @internal */
+	_renderingTracker: ReactRenderingTracker;
+}

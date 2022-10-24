@@ -13,6 +13,8 @@ npm install react-afterthought
 ## Basic Usage
 
 Here we create a simple counter and an increment button.
+Example available on codepen
+https://codepen.io/ned-stuart/pen/YzvKEWd
 
 ```jsx
 import React from 'react';
@@ -43,23 +45,32 @@ root.render(<App />);
 ```
 
 ### Types of services:
-Services can be objects or classes:
+Services can be objects or classes, they can contain functions, arrays, other objects and their own getters/setters:
 ```jsx
 import {AfterthoughtInjector, AfterthoughtService, createInjector} from "react-afterthought";
 
 class Service {
     number = 1
+    increment() {
+        this.number++;
+    }
 }
 
 // or extending the declared afterthought service.
 // doing this gives you access to other services via the "services" property
 class Service extends AfterthoughtService {
     number = 1
+    increment() {
+        this.number++;
+    }
 }
 
 // as a plain object
 const Service = {
-    number: 1
+    number: 1,
+    increment() {
+        this.number++;
+    }
 }
 ```
 

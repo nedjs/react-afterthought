@@ -5,28 +5,45 @@ import {
 	ClassConstructor, ValidServiceKey, ServiceHistory, ServiceInstances, ServiceDefinitions
 } from "./types";
 import {
+	createRenderingTracker,
 	currentRenderingComponentName,
-	debug,
-	RS_CONTEXT
+	debug, ReactRenderingTracker,
 } from "./util/helpers";
 import {Dispatcher, DispatchHandler} from "./util/Dispatcher";
-import {AfterthoughtService, SYM_SERVICE_WATCHES, SYM_SERVICE_PATH} from "./AfterthoughtService";
+import {AfterthoughtService, SYM_PROXY_INDICATOR, SYM_WATCHES} from "./AfterthoughtService";
 
 
 export function createInjector<TServices = AfterthoughtServices>(services: TServices): AfterthoughtInjector<TServices> {
-	return new CreateInjector<TServices>(services as any)
+	return new AfterthoughtInjectorImpl<TServices>(services as any)
 }
 
-class CreateInjector<TServices = AfterthoughtServices> implements AfterthoughtInjector<TServices> {
+function unwrapProxy(obj: any) {
+	if(Array.isArray(obj)) {
+		return obj.map(unwrapProxy);
+	} else if(obj) {
+		let v = obj[SYM_PROXY_INDICATOR];
+		if(v) return v;
+	}
+
+	return obj;
+}
+
+class AfterthoughtInjectorImpl<TServices = AfterthoughtServices> implements AfterthoughtInjector<TServices> {
+	public readonly _renderingTracker = createRenderingTracker();
+
+	public readonly services: ServiceInstances<TServices> = createServiceProxy(this);
 	private readonly serviceNames = new Map<string, any>();
 	private readonly dispatcher = new Dispatcher();
 	private readonly serviceInstances = new Map<any, {
 		instance: any,
 		type: any,
-		name: string,
+		name: string
 	}>;
+	private readonly injectorContext: ServiceContext = {
+		renderingTracker: this._renderingTracker,
+		dispatcher: this.dispatcher
+	}
 
-	public readonly services: ServiceInstances<TServices> = new Proxy({}, new ServicesProxyHandler(this as AfterthoughtInjector<any>));
 
 	constructor(
 		config: ServiceDefinitions<TServices>
@@ -37,7 +54,7 @@ class CreateInjector<TServices = AfterthoughtServices> implements AfterthoughtIn
 			this.serviceInstances.set(config[key], {
 				instance: this.initService(config[key]),
 				type: config[key],
-				name: key
+				name: key,
 			})
 		}
 
@@ -57,7 +74,11 @@ class CreateInjector<TServices = AfterthoughtServices> implements AfterthoughtIn
 		return this.initServiceProxy(service).proxy;
 	}
 
-	private initServiceProxy(service: ValidServiceKey<TServices>) {
+	_getDerivedService<T extends ValidServiceKey<TServices>>(service: T, context: ProxyContext): ToServiceInstance<T, TServices> {
+		return this.initServiceProxy(service, context).proxy;
+	}
+
+	private initServiceProxy(service: ValidServiceKey<TServices>, context?: ProxyContext) {
 		if (typeof service === 'string') {
 			service = this.serviceNames.get(service);
 		}
@@ -67,7 +88,11 @@ class CreateInjector<TServices = AfterthoughtServices> implements AfterthoughtIn
 			throw new Error('Unregistered service ' + String(service));
 		}
 
-		const proxyHandler = new ObjectProxyHandler(entry.name, this.dispatcher)
+		if(!context) {
+			context = createProxyContext();
+		}
+
+		const proxyHandler = new ObjectProxyHandler(entry.instance, entry.name, createServiceProxy(this, context), this.injectorContext, context)
 
 		return {
 			proxy: new Proxy(entry.instance, proxyHandler),
@@ -92,7 +117,6 @@ class CreateInjector<TServices = AfterthoughtServices> implements AfterthoughtIn
 			instance = service;
 		}
 
-		AfterthoughtService.init(instance, this as AfterthoughtInjector<any>);
 		return instance;
 	}
 
@@ -101,22 +125,32 @@ class CreateInjector<TServices = AfterthoughtServices> implements AfterthoughtIn
 	}
 }
 
-class ServicesProxyHandler implements ProxyHandler<any> {
-	constructor(
-		private readonly injector: AfterthoughtInjector<any>
-	) {
-	}
 
-	get(target: any, p: string | symbol, receiver: any): any {
-		if (typeof p === 'string') {
-			return this.injector.getService(p);
-		} else {
-			return target[p];
+function createServiceProxy(injector: AfterthoughtInjectorImpl<any>, proxyContext: ProxyContext = undefined) {
+	return new Proxy({}, {
+		get(target: any, p: string | symbol, receiver: any): any {
+			if (typeof p === 'string') {
+				return injector._getDerivedService(p, proxyContext);
+			} else {
+				return target[p];
+			}
+		},
+		set(target: any, p: string | symbol, newValue: any, receiver: any): boolean {
+			throw new Error('Cannot set a service here, services must be registered.')
 		}
-	}
+	})
+}
 
-	set(target: any, p: string | symbol, newValue: any, receiver: any): boolean {
-		throw new Error('Cannot set a service here, services must be registered.')
+type ServiceContext = {
+	renderingTracker: ReactRenderingTracker,
+	dispatcher: Dispatcher,
+};
+
+type ProxyContext = ReturnType<typeof createProxyContext>;
+function createProxyContext() {
+	return {
+		watches: new Set<string>(),
+		servicesRef: { value: null }
 	}
 }
 
@@ -124,23 +158,21 @@ class ObjectProxyHandler implements ProxyHandler<any> {
 	public readonly proxies = new WeakMap<any, any>();
 
 	constructor(
+		public readonly target: any,
 		public readonly path: string,
-		public readonly dispatcher: Dispatcher,
-		public readonly watchPaths: Set<string> = new Set(),
+		public readonly services: any,
+		public readonly serviceContext: ServiceContext,
+		public readonly proxyContext: ProxyContext,
 	) {
 	}
 
 	get(target: object, p: string | symbol, receiver: any): any {
-		if (target instanceof AfterthoughtService && AfterthoughtService.prototype.hasOwnProperty(p)) {
-			// dont proxy types which exist on ReactiveService
-			if(p === 'services') {
-
-			}
-			return target[p];
-		} else if(p === SYM_SERVICE_WATCHES) {
-			return this.watchPaths;
-		} else if(p === SYM_SERVICE_PATH) {
-			return this.path;
+		if(p === SYM_PROXY_INDICATOR) {
+			return this.target;
+		} else if(p === SYM_WATCHES) {
+			return this.proxyContext.watches;
+		} else if (p === 'services' && this.services) {
+			return this.services;
 		}
 
 		let result;
@@ -149,16 +181,16 @@ class ObjectProxyHandler implements ProxyHandler<any> {
 			result = target[p];
 		} else if (target[p] !== null && typeof target[p] === 'object') {
 			if (!this.proxies.has(target[p]) || this.proxies.get(target[p]) == null) {
-				this.proxies.set(target[p], new Proxy(target[p], new ObjectProxyHandler(propPath, this.dispatcher, this.watchPaths)));
+				this.proxies.set(target[p], new Proxy(target[p], new ObjectProxyHandler(target[p], propPath, null, this.serviceContext, this.proxyContext)));
 			}
 			result = this.proxies.get(target[p]);
 		} else {
 			result = target[p];
 		}
 
-		if (RS_CONTEXT.current) {
+		if (this.serviceContext.renderingTracker.isRendering) {
 			debug('RS-listen:', currentRenderingComponentName(), propPath);
-			AfterthoughtService.getWatches(RS_CONTEXT.current).add(propPath);
+			this.proxyContext.watches.add(propPath);
 		} else {
 			debug('RS-ignore:', currentRenderingComponentName(), propPath);
 		}
@@ -167,30 +199,32 @@ class ObjectProxyHandler implements ProxyHandler<any> {
 	}
 
 	set(target: object, p: string | symbol, newValue: any, receiver: any): boolean {
-		if (RS_CONTEXT.current) {
+		if (this.serviceContext.renderingTracker.isRendering) {
 			throw new Error('Trying to improperly set property: "' + String(p) + '" during a rendering. This will cause an infinite loop and is not allowed. Full path is "' + this.pathForProp(p) + '"');
 		}
+
+		newValue = unwrapProxy(newValue);
 
 		let oldValue = target[p];
 		if (Array.isArray(target)) {
 			const preLen = target.length;
 			const oldVal = target[p];
-			target[p] = newValue;
+			target[p] = unwrapProxy(newValue);
 
 			if (oldVal !== newValue) {
 				const path = this.pathForProp(p);
-				this.dispatcher.emit({path, oldValue, newValue});
+				this.serviceContext.dispatcher.emit({path, oldValue, newValue});
 			}
 
 			if (target.length !== preLen) {
 				const path = this.pathForProp('length');
-				this.dispatcher.emit({path, oldValue: preLen, newValue: target.length});
+				this.serviceContext.dispatcher.emit({path, oldValue: preLen, newValue: target.length});
 			}
 		} else {
-			target[p] = newValue;
+			target[p] = unwrapProxy(newValue);
 			if (oldValue !== newValue) {
 				const path = this.pathForProp(p);
-				this.dispatcher.emit({path, oldValue, newValue});
+				this.serviceContext.dispatcher.emit({path, oldValue, newValue});
 			}
 		}
 		return true;

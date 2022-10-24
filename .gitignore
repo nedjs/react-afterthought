@@ -1,6 +1,7 @@
 .idea
 .vscode
 .DS_Store
+local.*.sh
 yarn-error.log
 react-afterthought-*.tgz
 node_modules

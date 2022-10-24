@@ -1,6 +1,6 @@
 {
   "name": "react-afterthought",
-  "version": "0.0.8-beta",
+  "version": "0.0.9-beta",
   "description": "Service based React state management",
   "homepage": "https://github.com/nedjs/react-afterthought/",
   "bugs": "https://github.com/nedjs/react-afterthought/issues",
@@ -21,9 +21,9 @@
   "module": "./dist/esm/index.js",
   "scripts": {
     "prepack": "yarn run build",
-    "build": "tsc -p . && node build.js && rollup -c",
-    "build-dev": "tsc -p . && node build.js -dev && rollup -c",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc -p tsconfig.build.json && node build.js && rollup -c",
+    "build-dev": "tsc -p tsconfig.build.json && node build.js -dev && rollup -c",
+    "test": "jest"
   },
   "peerDependencies": {
     "react": ">=16.8"

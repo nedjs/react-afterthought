@@ -1,20 +1,47 @@
 import React from "react";
+import {SYM_PROXY_INDICATOR, SYM_WATCHES} from "../AfterthoughtService";
 
-// Our sneeky way of tracking rendering in react... it's not ideal at all
-export const RS_CONTEXT = (() => {
-	let stack = [];
+/**
+ * @internal
+ */
+export interface ReactRenderingTracker {
+	get isRendering(): boolean;
+	notifyIsRendering(): void;
+
+	/**
+	 * Resets the tracker back to initial state (not rendering).
+	 */
+	reset(): void;
+}
+
+/**
+ * @internal
+ */
+export function createRenderingTracker(): ReactRenderingTracker {
+	let handle = null;
 	return {
-		get current() {
-			return stack[stack.length-1];
+		get isRendering(): boolean {
+			return handle !== null;
 		},
-		enter(service: any) {
-			stack.push(service);
+		notifyIsRendering(): void {
+			if(handle === null) {
+				handle = setTimeout(() => {
+					handle = null
+				});
+			}
 		},
-		exit() {
-			stack.pop();
+		reset() {
+			if(handle) {
+				clearTimeout(handle);
+				handle = null;
+			}
 		}
-	};
-})();
+	}
+}
+
+export function getWatches(service: any): Set<string> {
+	return service[SYM_WATCHES];
+}
 
 
 /**

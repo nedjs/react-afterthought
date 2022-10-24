@@ -18,11 +18,9 @@
     "stripInternal": true
   },
   "include": [
-    "src/**/*",
-    "test/**/*",
-    "examples/**/*"
+    "src/**/*"
   ],
   "exclude": [
-    "../node_modules"
+    "./node_modules"
   ]
 }

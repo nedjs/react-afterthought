@@ -1,6 +1,6 @@
 import {AfterthoughtInjector, ServiceDefinitions, ValidServiceKey} from "./types";
 import {createInjector} from "./createInjector";
-import React, {createContext, useRef} from "react";
+import React, {createContext, useLayoutEffect, useRef} from "react";
 
 export const AfterthoughtContext = createContext<AfterthoughtInjector>(null as any);
 

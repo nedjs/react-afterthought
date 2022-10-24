@@ -12,7 +12,7 @@ export declare type ServiceDefinitions<TServices> = {
 export declare type ServiceInstances<TServices> = {
     [K in keyof TServices]: ToServiceInstance<TServices[K], TServices>;
 };
-export declare type UnwrapConstructor<T> = T extends (new (...args: any[]) => infer U) ? U : T;
+export declare type UnwrapConstructor<T> = T extends (new (...args: any[]) => infer U) ? U : T extends object ? T : never;
 export declare type ToServiceInstance<T, TServices> = T extends keyof TServices ? UnwrapConstructor<TServices[T]> : UnwrapConstructor<T>;
 export interface ServiceHistory {
     path: string;
@@ -26,4 +26,3 @@ export interface AfterthoughtInjector<TServices = AfterthoughtServices> {
     subscribe(callback: DispatchHandler<ServiceHistory>): () => void;
     getService<T extends ValidServiceKey<TServices>>(service: T): ToServiceInstance<T, TServices>;
 }
-export declare type ReactiveServiceInstance2<T, TServices extends AfterthoughtServices> = T extends keyof TServices ? TServices[T] : T extends (new (...args: any[]) => infer U) ? U : T;

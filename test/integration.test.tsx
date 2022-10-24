@@ -42,6 +42,7 @@ describe('Integration: rendering', () => {
 	it('doesnt re-render on unsued value', async () => {
 		const {Component, injector} = createTestComponent();
 		render(<Component />);
+		injector._renderingTracker.reset();
 
 		// check updating a not used value has no effect on render
 		await act(async () => {
@@ -55,6 +56,7 @@ describe('Integration: rendering', () => {
 	it('re-renders through component interaction', async () => {
 		const {Component, injector} = createTestComponent();
 		render(<Component />);
+		injector._renderingTracker.reset();
 
 		await act(async () => {
 			const el = await screen.findByRole('increment');
@@ -67,6 +69,7 @@ describe('Integration: rendering', () => {
 	it('re-renders through external modification', async () => {
 		const {Component, injector} = createTestComponent();
 		render(<Component />);
+		injector._renderingTracker.reset();
 
 		await act(async () => {
 			injector.services.Service.number++;
