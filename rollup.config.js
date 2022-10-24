@@ -6,7 +6,7 @@ module.exports = {
         format: 'umd',
         compact: true,
         sourcemap: true,
-        name: 'ReactiveServices',
+        name: 'Afterthought',
         globals: {
             react: 'React',
         },
