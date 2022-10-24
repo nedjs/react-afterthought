@@ -1,5 +1,6 @@
 .idea
 .vscode
+.DS_Store
 yarn-error.log
 react-afterthought-*.tgz
 node_modules
