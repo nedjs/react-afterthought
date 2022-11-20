@@ -16,9 +16,12 @@ class ListNode<T> {
 	) {}
 
 	add(node: ListNode<T>) {
-		const pn = this.next;
+		node.next = this.next;
+		if(this.next) {
+			this.next.prev = node;
+		}
+
 		this.next = node;
-		node.next = pn;
 		node.prev = this;
 	}
 
